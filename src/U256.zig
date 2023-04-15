@@ -1,5 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
+const fmt = std.fmt;
 
 data: [4]u64,
 
@@ -21,6 +22,10 @@ pub fn fromHex(hex: []const u8) !Self {
     return Self{ .data = data };
 }
 
+pub fn format(self: *const Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("{x:0>16}{x:0>16}{x:0>16}{x:0>16}", .{ self.data[3], self.data[2], self.data[1], self.data[0] });
+}
+
 test "fromHex" {
     {
         const actual = try fromHex("ff");
@@ -29,5 +34,18 @@ test "fromHex" {
     {
         const actual = try fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         try testing.expectEqualDeep(Self{ .data = [4]u64{ 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615 } }, actual);
+    }
+}
+
+test "format" {
+    {
+        const actual = try fmt.allocPrint(testing.allocator, "{}", .{try fromHex("ff")});
+        defer testing.allocator.free(actual);
+        try testing.expectEqualStrings("00000000000000000000000000000000000000000000000000000000000000ff", actual);
+    }
+    {
+        const actual = try fmt.allocPrint(testing.allocator, "{}", .{try fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")});
+        defer testing.allocator.free(actual);
+        try testing.expectEqualStrings("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", actual);
     }
 }

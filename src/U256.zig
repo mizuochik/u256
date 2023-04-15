@@ -26,6 +26,15 @@ pub fn format(self: *const Self, comptime _: []const u8, _: std.fmt.FormatOption
     try writer.print("{x:0>16}{x:0>16}{x:0>16}{x:0>16}", .{ self.data[3], self.data[2], self.data[1], self.data[0] });
 }
 
+pub fn eql(self: *const Self, other: *const Self) bool {
+    var i = 0;
+    var ans = true;
+    while (i < 4) : (i += 1) {
+        ans = ans and self.data[i] == other.data[i];
+    }
+    return ans;
+}
+
 pub fn add(x: *Self, y: *Self) Self {
     var z = Self{ .data = [4]u64{ 0, 0, 0, 0 } };
     var carry: u64 = 0;

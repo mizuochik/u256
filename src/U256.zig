@@ -48,6 +48,19 @@ pub fn add(x: *Self, y: *Self) Self {
     return z;
 }
 
+pub fn sub(x: *Self, y: *Self) Self {
+    var z = Self{ .data = [4]u64{ 0, 0, 0, 0 } };
+    var carry: u64 = 0;
+    var i: u8 = 0;
+    while (i < 4) : (i += 1) {
+        const v = @subWithOverflow(x.data[i], y.data[i]);
+        const w = @subWithOverflow(v[0], carry);
+        z.data[i] = w[0];
+        carry = v[1] + w[1];
+    }
+    return z;
+}
+
 test "fromHex" {
     {
         const actual = try fromHex("ff");
@@ -82,5 +95,13 @@ test "add" {
         var x = try fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         var y = try fromHex("1");
         try testing.expectEqualDeep(try fromHex("0"), x.add(&y));
+    }
+}
+
+test "sub" {
+    {
+        var x = try fromHex("0000000000000000000000000000000000000000000000000000000000000000");
+        var y = try fromHex("1");
+        try testing.expectEqualDeep(try fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), x.sub(&y));
     }
 }

@@ -61,6 +61,32 @@ pub fn sub(x: *Self, y: *Self) Self {
     return z;
 }
 
+pub fn mul(x: *Self, y: *Self) Self {
+    var res = [4]u64{ 0, 0, 0, 0 };
+    var v = mul64(x.data[0], y.data[0]);
+    res[0] = v.lo;
+    v = mulHop(v.hi, x.data[1], y.data[0]);
+    var res1 = v.lo;
+    v = mulHop(v.hi, x.data[2], y.data[0]);
+    var res2 = v.lo;
+    var res3 = @addWithOverflow(@mulWithOverflow(x.data[3], y.data[0])[0], v.hi)[0];
+
+    v = mulHop(res1, x.data[0], y.data[1]);
+    res[1] = v.lo;
+    v = mulStep(res2, x.data[1], y.data[1], v.hi);
+    res2 = v.lo;
+    res3 = @addWithOverflow(@addWithOverflow(res3, @mulWithOverflow(x.data[2], y.data[1])[0])[0], v.hi)[0];
+
+    v = mulHop(res2, x.data[0], y.data[2]);
+    res[2] = v.lo;
+    res3 = @addWithOverflow(@addWithOverflow(res3, @mulWithOverflow(x.data[1], y.data[2])[0])[0], v.hi)[0];
+    res[3] = @addWithOverflow(res3, @mulWithOverflow(x.data[0], y.data[3])[0])[0];
+
+    return Self{
+        .data = res,
+    };
+}
+
 const U64Pair = struct {
     hi: u64,
     lo: u64,
@@ -77,7 +103,7 @@ fn mul64(x: u64, y: u64) U64Pair {
     const t = @addWithOverflow(@mulWithOverflow(x1, y0)[0], w0 >> 32)[0];
     var w1 = t & MASK32;
     const w2 = t >> 32;
-    w1 = @addWithOverflow(w1, @mulWithOverflow(x0, y1)[0]);
+    w1 = @addWithOverflow(w1, @mulWithOverflow(x0, y1)[0])[0];
     return U64Pair{
         .hi = @addWithOverflow(@addWithOverflow(@mulWithOverflow(x1, y1)[0], w2)[0], w1 >> 32)[0],
         .lo = @mulWithOverflow(x, y)[0],
@@ -85,13 +111,26 @@ fn mul64(x: u64, y: u64) U64Pair {
 }
 
 // z + x * y
-fn umulHop(z: u64, x: u64, y: u64) U64Pair {
-    const v = mul64(x, y);
-    const lo = @addWithOverflow(v.lo, z);
-    const hi = @addWithOverflow(v.hi, lo[1]);
+fn mulHop(z: u64, x: u64, y: u64) U64Pair {
+    const xy = mul64(x, y);
+    const lo = @addWithOverflow(xy.lo, z);
+    const hi = @addWithOverflow(xy.hi, lo[1]);
     return U64Pair{
-        .hi = hi,
-        .lo = lo,
+        .hi = hi[0],
+        .lo = lo[0],
+    };
+}
+
+// z + x * y + carry
+fn mulStep(z: u64, x: u64, y: u64, carry: u64) U64Pair {
+    const xy = mul64(x, y);
+    var lo = @addWithOverflow(xy.lo, carry);
+    var hi = @addWithOverflow(xy.hi, lo[1]);
+    lo = @addWithOverflow(lo[0], z);
+    hi = @addWithOverflow(hi[0], lo[1]);
+    return U64Pair{
+        .hi = hi[0],
+        .lo = lo[0],
     };
 }
 
@@ -137,5 +176,23 @@ test "sub" {
         var x = try fromHex("0000000000000000000000000000000000000000000000000000000000000000");
         var y = try fromHex("1");
         try testing.expectEqualDeep(try fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), x.sub(&y));
+    }
+}
+
+test "mul" {
+    {
+        var x = try fromHex("3");
+        var y = try fromHex("4");
+        try testing.expectEqualDeep(try fromHex("c"), x.mul(&y));
+    }
+    {
+        var x = try fromHex("ffffffffffffffff");
+        var y = try fromHex("ffffffffffffffff");
+        try testing.expectEqualDeep(try fromHex("fffffffffffffffe0000000000000001"), x.mul(&y));
+    }
+    {
+        var x = try fromHex("fffffffffffffffe0000000000000001");
+        var y = try fromHex("fffffffffffffffe0000000000000001");
+        try testing.expectEqual(try fromHex("fffffffffffffffc0000000000000005fffffffffffffffc0000000000000001"), x.mul(&y));
     }
 }

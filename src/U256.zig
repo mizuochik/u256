@@ -61,6 +61,40 @@ pub fn sub(x: *Self, y: *Self) Self {
     return z;
 }
 
+const U64Pair = struct {
+    hi: u64,
+    lo: u64,
+};
+
+const MASK32 = (1 << 32) - 1;
+
+fn mul64(x: u64, y: u64) U64Pair {
+    const x0 = x & MASK32;
+    const x1 = x >> 32;
+    const y0 = y & MASK32;
+    const y1 = y >> 32;
+    const w0 = @mulWithOverflow(x0, y0)[0];
+    const t = @addWithOverflow(@mulWithOverflow(x1, y0)[0], w0 >> 32)[0];
+    var w1 = t & MASK32;
+    const w2 = t >> 32;
+    w1 = @addWithOverflow(w1, @mulWithOverflow(x0, y1)[0]);
+    return U64Pair{
+        .hi = @addWithOverflow(@addWithOverflow(@mulWithOverflow(x1, y1)[0], w2)[0], w1 >> 32)[0],
+        .lo = @mulWithOverflow(x, y)[0],
+    };
+}
+
+// z + x * y
+fn umulHop(z: u64, x: u64, y: u64) U64Pair {
+    const v = mul64(x, y);
+    const lo = @addWithOverflow(v.lo, z);
+    const hi = @addWithOverflow(v.hi, lo[1]);
+    return U64Pair{
+        .hi = hi,
+        .lo = lo,
+    };
+}
+
 test "fromHex" {
     {
         const actual = try fromHex("ff");
